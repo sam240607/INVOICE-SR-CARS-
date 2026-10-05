@@ -157,41 +157,29 @@ function App() {
     const element = document.getElementById('invoice-preview');
     if (!element) return;
     
-    // Save current state
-    const originalScrollY = window.scrollY;
-    const originalShadow = element.style.boxShadow;
+    // Create a clone of the element to capture it without scroll/viewport clipping
+    const clone = element.cloneNode(true);
     
-    const previewSection = element.closest('.preview-section');
-    const originalHeight = previewSection ? previewSection.style.height : '';
-    const originalOverflow = previewSection ? previewSection.style.overflow : '';
-    const originalPosition = previewSection ? previewSection.style.position : '';
+    // Position the clone absolutely off-screen to avoid disrupting the UI
+    clone.style.position = 'absolute';
+    clone.style.top = '-9999px';
+    clone.style.left = '-9999px';
+    clone.style.width = element.offsetWidth + 'px'; // Maintain original width
+    clone.style.boxShadow = 'none'; // Remove shadow for clean PDF
     
-    // Prepare for capture: remove shadow, expand container, and scroll to top
-    element.style.boxShadow = 'none';
-    if (previewSection) {
-      previewSection.style.height = 'auto';
-      previewSection.style.overflow = 'visible';
-      previewSection.style.position = 'static';
-    }
-    window.scrollTo(0, 0);
+    document.body.appendChild(clone);
     
     try {
-      const canvas = await html2canvas(element, {
+      const canvas = await html2canvas(clone, {
         scale: 2, // High resolution
         useCORS: true,
         backgroundColor: '#ffffff',
-        scrollY: 0,
-        windowHeight: element.scrollHeight
+        windowWidth: clone.scrollWidth,
+        windowHeight: clone.scrollHeight
       });
       
-      // Restore original state
-      element.style.boxShadow = originalShadow;
-      if (previewSection) {
-        previewSection.style.height = originalHeight;
-        previewSection.style.overflow = originalOverflow;
-        previewSection.style.position = originalPosition;
-      }
-      window.scrollTo(0, originalScrollY);
+      // Remove the clone immediately after capture
+      document.body.removeChild(clone);
       
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
@@ -203,20 +191,15 @@ function App() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       
+      // If the image is taller than the page, it might still go off the bottom,
+      // but the image itself won't be truncated by html2canvas anymore.
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Bill_${invoice.clientName || 'Export'}.pdf`);
     } catch (err) {
       console.error('PDF Export failed, falling back to print', err);
-      
-      // Restore on error as well
-      element.style.boxShadow = originalShadow;
-      if (previewSection) {
-        previewSection.style.height = originalHeight;
-        previewSection.style.overflow = originalOverflow;
-        previewSection.style.position = originalPosition;
+      if (document.body.contains(clone)) {
+        document.body.removeChild(clone);
       }
-      window.scrollTo(0, originalScrollY);
-      
       window.print();
     }
   };
