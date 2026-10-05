@@ -189,11 +189,22 @@ function App() {
       });
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
       
-      // If the image is taller than the page, it might still go off the bottom,
-      // but the image itself won't be truncated by html2canvas anymore.
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      let imgWidth = pdfWidth;
+      let imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // If the invoice is taller than an A4 page, scale it down to fit
+      // so that the Grand Total and footer are never cut off.
+      if (imgHeight > pdfPageHeight) {
+        imgHeight = pdfPageHeight;
+        imgWidth = (canvas.width * imgHeight) / canvas.height;
+      }
+      
+      // Center the image horizontally if it was scaled down
+      const x = (pdfWidth - imgWidth) / 2;
+      
+      pdf.addImage(imgData, 'PNG', x, 0, imgWidth, imgHeight);
       pdf.save(`Bill_${invoice.clientName || 'Export'}.pdf`);
     } catch (err) {
       console.error('PDF Export failed, falling back to print', err);
