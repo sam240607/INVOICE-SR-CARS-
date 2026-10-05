@@ -157,18 +157,41 @@ function App() {
     const element = document.getElementById('invoice-preview');
     if (!element) return;
     
-    // Optional: Add a temporary class or style if needed for capture
+    // Save current state
+    const originalScrollY = window.scrollY;
     const originalShadow = element.style.boxShadow;
-    element.style.boxShadow = 'none'; // Remove shadow for clean PDF
+    
+    const previewSection = element.closest('.preview-section');
+    const originalHeight = previewSection ? previewSection.style.height : '';
+    const originalOverflow = previewSection ? previewSection.style.overflow : '';
+    const originalPosition = previewSection ? previewSection.style.position : '';
+    
+    // Prepare for capture: remove shadow, expand container, and scroll to top
+    element.style.boxShadow = 'none';
+    if (previewSection) {
+      previewSection.style.height = 'auto';
+      previewSection.style.overflow = 'visible';
+      previewSection.style.position = 'static';
+    }
+    window.scrollTo(0, 0);
     
     try {
       const canvas = await html2canvas(element, {
         scale: 2, // High resolution
         useCORS: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        scrollY: 0,
+        windowHeight: element.scrollHeight
       });
       
-      element.style.boxShadow = originalShadow; // Restore shadow
+      // Restore original state
+      element.style.boxShadow = originalShadow;
+      if (previewSection) {
+        previewSection.style.height = originalHeight;
+        previewSection.style.overflow = originalOverflow;
+        previewSection.style.position = originalPosition;
+      }
+      window.scrollTo(0, originalScrollY);
       
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
@@ -184,6 +207,16 @@ function App() {
       pdf.save(`Bill_${invoice.clientName || 'Export'}.pdf`);
     } catch (err) {
       console.error('PDF Export failed, falling back to print', err);
+      
+      // Restore on error as well
+      element.style.boxShadow = originalShadow;
+      if (previewSection) {
+        previewSection.style.height = originalHeight;
+        previewSection.style.overflow = originalOverflow;
+        previewSection.style.position = originalPosition;
+      }
+      window.scrollTo(0, originalScrollY);
+      
       window.print();
     }
   };
